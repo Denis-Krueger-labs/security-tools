@@ -1,0 +1,742 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# ============================================================
+# MORI Helper v2
+#
+# Tiny HTB workspace bootstrapper maintained by a judgmental
+# Maine Coon.
+#
+# Usage:
+#   mori-helper <machine-name> <ip> [hostname]
+#
+# Examples:
+#   mori-helper Puppy 10.10.11.70
+#   mori-helper Puppy 10.10.11.70 puppy.htb
+# ============================================================
+
+
+# ------------------------------------------------------------
+# MORI
+# ------------------------------------------------------------
+
+mori() {
+cat <<'MORI'
+              /\_____/\
+             /  o   o  \
+            ( ==  ^  == )
+             )         (
+            (           )
+           ( (  )   (  ) )
+          (__(__)___(__)__)
+
+              M O R I
+      target preparation department
+MORI
+}
+
+
+# ------------------------------------------------------------
+# Usage
+# ------------------------------------------------------------
+
+usage() {
+    mori
+
+    echo
+    echo "MORI stares at you."
+    echo
+    echo "Usage:"
+    echo "  mori-helper <machine-name> <ip> [hostname]"
+    echo
+    echo "Examples:"
+    echo "  mori-helper Puppy 10.10.11.70"
+    echo "  mori-helper Puppy 10.10.11.70 puppy.htb"
+    echo
+    echo '"You forgot the target.'
+    echo ' This is generally considered important."'
+    echo
+
+    exit 1
+}
+
+[[ $# -lt 2 || $# -gt 3 ]] && usage
+
+
+# ------------------------------------------------------------
+# Arguments
+# ------------------------------------------------------------
+
+NAME="$1"
+TARGET="$2"
+HOSTNAME="${3:-}"
+
+
+# ------------------------------------------------------------
+# Validate IPv4-ish input
+# ------------------------------------------------------------
+
+if ! [[ "$TARGET" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+    echo
+    mori
+    echo
+    echo "MORI does not approve."
+    echo
+    echo "That does not look like an IPv4 address:"
+    echo "  $TARGET"
+    echo
+
+    exit 1
+fi
+
+
+# ------------------------------------------------------------
+# Create filesystem-safe machine slug
+# ------------------------------------------------------------
+
+SLUG="$(
+    printf '%s' "$NAME" |
+    tr '[:upper:]' '[:lower:]' |
+    tr ' ' '-' |
+    tr -cd '[:alnum:]._-'
+)"
+
+if [[ -z "$SLUG" ]]; then
+    echo "[!] Could not generate a valid workspace name."
+    exit 1
+fi
+
+BASE="$HOME/htb/machines/$SLUG"
+
+
+# ------------------------------------------------------------
+# Protect existing workspace
+# ------------------------------------------------------------
+
+if [[ -e "$BASE" ]]; then
+    echo
+    mori
+    echo
+    echo "MORI: Absolutely not."
+    echo
+    echo "That workspace already exists:"
+    echo
+    echo "  $BASE"
+    echo
+    echo "\"I'm a cat, not your data-loss prevention strategy.\""
+    echo
+
+    exit 1
+fi
+
+
+# ------------------------------------------------------------
+# Detect HTB VPN address
+# ------------------------------------------------------------
+
+LHOST=""
+
+if ip link show tun0 >/dev/null 2>&1; then
+    LHOST="$(
+        ip -4 addr show tun0 2>/dev/null |
+        awk '/inet / {print $2}' |
+        cut -d/ -f1 |
+        head -n1
+    )"
+fi
+
+
+# ------------------------------------------------------------
+# Create workspace
+# ------------------------------------------------------------
+
+mkdir -p \
+    "$BASE/scans/nmap" \
+    "$BASE/scans/web" \
+    "$BASE/web" \
+    "$BASE/exploits" \
+    "$BASE/loot" \
+    "$BASE/files" \
+    "$BASE/screenshots" \
+    "$BASE/scripts"
+
+
+# ------------------------------------------------------------
+# Environment variables
+# ------------------------------------------------------------
+
+cat > "$BASE/target.env" <<ENV
+export HTB_NAME="$NAME"
+export TARGET="$TARGET"
+export RHOST="$TARGET"
+export LHOST="$LHOST"
+export HTB_HOSTNAME="$HOSTNAME"
+export HTB_WORKSPACE="$BASE"
+ENV
+
+
+# ------------------------------------------------------------
+# Working notes
+# ------------------------------------------------------------
+
+cat > "$BASE/notes.md" <<NOTES
+# $NAME — Working Notes
+
+## Target
+
+| Field | Value |
+|---|---|
+| Machine | $NAME |
+| IP | \`$TARGET\` |
+| Hostname | \`${HOSTNAME:-TBD}\` |
+| LHOST | \`${LHOST:-TBD}\` |
+| Started | $(date '+%Y-%m-%d %H:%M') |
+
+---
+
+## Enumeration
+
+### Ports
+
+\`\`\`text
+
+\`\`\`
+
+### Services
+
+\`\`\`text
+
+\`\`\`
+
+### Web
+
+\`\`\`text
+
+\`\`\`
+
+---
+
+## Credentials
+
+| Username | Password / Hash | Source |
+|---|---|---|
+| | | |
+
+---
+
+## Findings
+
+### Interesting Files
+
+-
+
+### Users
+
+-
+
+### Services
+
+-
+
+---
+
+## Initial Access
+
+-
+
+---
+
+## Privilege Escalation
+
+-
+
+---
+
+## Loot
+
+-
+
+---
+
+## Flags
+
+### User
+
+\`\`\`text
+
+\`\`\`
+
+### Root
+
+\`\`\`text
+
+\`\`\`
+
+---
+
+## Commands / Notes
+
+\`\`\`bash
+
+\`\`\`
+NOTES
+
+
+# ------------------------------------------------------------
+# Technical writeup template
+# ------------------------------------------------------------
+
+cat > "$BASE/writeup.md" <<WRITEUP
+<!--
+MORI REMINDER:
+
+Do not dare forget to write down what you did, mortal.
+
+Commands without context become archaeology.
+-->
+
+# $NAME — Technical Report
+
+> **Platform:** Hack The Box \
+> **Difficulty:** \`Easy\` / \`Medium\` / \`Hard\` / \`Insane\` \
+> **Date:** $(date '+%Y-%m-%d') \
+> **Author:** 0N1S3C \
+> **Target:** \`$TARGET\` \
+> **Hostname:** \`${HOSTNAME:-TBD}\` \
+> **Scope:** Authorized lab environment only
+
+---
+
+## 0. Executive Summary
+
+> One paragraph — plain English. What was the target, what was found,
+> how severe is it, what needs fixing first. Write this for a
+> non-technical reader.
+
+**Example:**
+
+> The "$NAME" machine was found to contain multiple security weaknesses
+> that could be chained to obtain unauthorized access and ultimately
+> compromise the system. Immediate remediation of the initial access
+> vector and privilege-escalation weakness is recommended.
+
+---
+
+## 1. Introduction
+
+This report documents the structured analysis and controlled exploitation
+of the **"$NAME"** machine on Hack The Box.
+
+**Target:** \`$TARGET\`
+
+**Objectives:**
+
+- Obtain user-level access
+- Obtain root/system-level access
+- Document the complete attack chain
+- Identify the underlying security weaknesses
+- Derive defensive and hardening recommendations
+
+**Methodology:** Assessment follows a structured penetration-testing
+workflow consisting of reconnaissance, enumeration, exploitation,
+post-exploitation, privilege escalation, and defensive analysis.
+
+---
+
+## 2. Attack Chain
+
+> One-line summary of the full exploitation path. Fill this in last.
+
+\`\`\`text
+[Initial Recon] → [Vector] → [Initial Access] → [Lateral Movement] → [Privesc] → [Root]
+\`\`\`
+
+**Example:**
+
+\`\`\`text
+Nmap → Web Enumeration → LFI → Credential Discovery → SSH → sudo misconfiguration → Root
+\`\`\`
+
+---
+
+## 3. Tools Used
+
+| Tool | Purpose |
+|---|---|
+| \`nmap\` | Port scanning and service detection |
+| \`ffuf\` / \`gobuster\` | Content discovery |
+| \`burpsuite\` | Request interception and analysis |
+| | |
+
+---
+
+## 4. Reconnaissance
+
+### 4.1 Initial Network Scan
+
+**Commands:**
+
+\`\`\`bash
+nmap -sC -sV -oA scans/nmap/initial \$TARGET
+nmap -p- -oA scans/nmap/all_ports \$TARGET
+\`\`\`
+
+**Findings:**
+
+| Port | Service | Version | Notes |
+|---|---|---|---|
+| | | | |
+| | | | |
+
+**Key Observations:**
+
+-
+-
+-
+
+---
+
+## 5. Service Enumeration
+
+> Analyze each exposed service individually for potential attack vectors.
+
+### 5.1 Web Enumeration
+
+**Tools Used:** \`ffuf\`, \`feroxbuster\`, \`gobuster\`, \`burpsuite\`, manual inspection
+
+**Findings:**
+
+-
+-
+
+### 5.2 Additional Services
+
+> SMB, FTP, SSH, databases, LDAP, RPC, custom services, etc.
+> Add subsections as required.
+
+---
+
+## 6. Initial Access
+
+### 6.1 Vulnerability Identification
+
+**Vulnerability:**
+
+**Location:**
+
+**Reasoning:**
+
+> Why was this vector investigated? What evidence suggested it was
+> vulnerable?
+
+### 6.2 Exploitation
+
+> Describe the exploitation process and relevant technical reasoning.
+
+> Sensitive values such as passwords, private tokens, and flags should
+> be omitted from public versions of this report.
+
+\`\`\`bash
+# Commands / payloads used (sanitize when publishing)
+\`\`\`
+
+**Result:** User-level access obtained as \`<username>\`.
+
+---
+
+## 7. Lateral Movement
+
+> Skip this section if initial access led directly to privilege
+> escalation.
+
+**From:** \`<initial user>\`
+
+**To:** \`<target user>\`
+
+**Method:**
+
+-
+-
+
+**Result:** Access obtained as \`<new user>\`.
+
+---
+
+## 8. Privilege Escalation
+
+### 8.1 Local Enumeration
+
+**Actions Performed:**
+
+- [ ] \`sudo -l\`
+- [ ] SUID binaries — \`find / -perm -4000 2>/dev/null\`
+- [ ] Cron jobs — \`cat /etc/crontab\`
+- [ ] Writable files and directories
+- [ ] Capabilities — \`getcap -r / 2>/dev/null\`
+- [ ] Running processes
+- [ ] Internal listening services
+- [ ] Bash history and configuration files
+- [ ] Interesting credentials or secrets
+- [ ] Automated enumeration where appropriate
+
+**Key Findings:**
+
+-
+-
+
+### 8.2 Escalation Vector
+
+**Vector:**
+
+**Root Cause:**
+
+> Why was this escalation possible? What configuration or security
+> weakness enabled it?
+
+\`\`\`bash
+# Exploitation commands (sanitize when publishing)
+\`\`\`
+
+**Result:** Root/system-level access achieved.
+
+---
+
+## 9. Findings Summary
+
+| # | Finding | Severity | Location |
+|---|---|---|---|
+| 1 | | 🔴 Critical | |
+| 2 | | 🟠 High | |
+| 3 | | 🟡 Medium | |
+| 4 | | 🔵 Low | |
+
+**Severity Scale:**
+
+\`🔴 Critical\` → \`🟠 High\` → \`🟡 Medium\` → \`🔵 Low\` → \`⚪ Info\`
+
+---
+
+## 10. Defensive Considerations
+
+### 10.1 Indicators of Compromise
+
+> What artifacts, logs, network events, authentication events, process
+> activity, or alerts could reveal this attack?
+
+-
+-
+-
+
+### 10.2 Security Weaknesses
+
+-
+-
+-
+
+### 10.3 Hardening Recommendations
+
+| Priority | Recommendation | Finding |
+|---|---|---|
+| Immediate | | |
+| Short-term | | |
+| Long-term | | |
+
+---
+
+## 11. Lessons Learned
+
+> What did this specific machine teach you?
+> Keep this specific and honest rather than reusing generic text.
+
+-
+-
+-
+
+---
+
+*End of Report*
+
+*Classification: Public — flags and sensitive values omitted*
+WRITEUP
+
+
+# ------------------------------------------------------------
+# Initial Nmap helper
+# ------------------------------------------------------------
+
+cat > "$BASE/scan.sh" <<'SCAN'
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(
+    cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1
+    pwd
+)"
+
+source "$SCRIPT_DIR/target.env"
+
+echo
+echo "========================================"
+echo " MORI Initial Scan"
+echo "========================================"
+echo
+echo "Machine : $HTB_NAME"
+echo "Target  : $TARGET"
+echo "LHOST   : ${LHOST:-not detected}"
+echo
+
+echo "[*] Running Nmap default scripts + version detection..."
+
+sudo nmap \
+    -Pn \
+    -sC \
+    -sV \
+    -oA "$SCRIPT_DIR/scans/nmap/initial" \
+    "$TARGET"
+
+echo
+echo "[+] Initial scan complete."
+echo "[+] Results:"
+echo "    $SCRIPT_DIR/scans/nmap/"
+echo
+SCAN
+
+chmod +x "$BASE/scan.sh"
+
+
+# ------------------------------------------------------------
+# Workspace README
+# ------------------------------------------------------------
+
+cat > "$BASE/README.md" <<README
+# $NAME Workspace
+
+Created by **MORI Helper v2**.
+
+## Enter
+
+\`\`\`bash
+cd "$BASE"
+source target.env
+\`\`\`
+
+## Variables
+
+\`\`\`bash
+echo "\$HTB_NAME"
+echo "\$TARGET"
+echo "\$RHOST"
+echo "\$LHOST"
+echo "\$HTB_HOSTNAME"
+\`\`\`
+
+## Initial Scan
+
+\`\`\`bash
+./scan.sh
+\`\`\`
+
+## Documentation
+
+Working notes:
+
+\`\`\`text
+notes.md
+\`\`\`
+
+Technical report:
+
+\`\`\`text
+writeup.md
+\`\`\`
+
+Use \`notes.md\` for messy working notes and \`writeup.md\` for the polished report.
+
+## Workspace
+
+\`\`\`text
+$SLUG/
+├── exploits/
+├── files/
+├── loot/
+├── notes.md
+├── writeup.md
+├── README.md
+├── scans/
+│   ├── nmap/
+│   └── web/
+├── scan.sh
+├── screenshots/
+├── scripts/
+├── target.env
+└── web/
+\`\`\`
+README
+
+
+# ------------------------------------------------------------
+# Success
+# ------------------------------------------------------------
+
+echo
+mori
+echo
+echo "MORI has prepared your target."
+echo
+echo "Machine : $NAME"
+echo "Target  : $TARGET"
+echo "LHOST   : ${LHOST:-not detected}"
+echo "Folder  : $BASE"
+
+if [[ -n "$HOSTNAME" ]]; then
+    echo "Hostname: $HOSTNAME"
+fi
+
+echo
+echo '"You automated twelve seconds of work.'
+echo ' Lazy? Yes.'
+echo ' Smart? Also yes."'
+echo
+
+echo "MORI has also prepared your technical report:"
+echo
+echo "  $BASE/writeup.md"
+echo
+echo '"Do not dare forget to write down what you did, mortal.'
+echo ' Future-you will not remember that weird curl command."'
+echo
+
+if [[ -z "$LHOST" ]]; then
+    echo "MORI also noticed that tun0 is missing."
+    echo
+    echo '"Perhaps connecting the VPN before requesting'
+    echo ' reverse shells would be strategically sound."'
+    echo
+fi
+
+if [[ -n "$HOSTNAME" ]]; then
+    echo "Optional /etc/hosts entry:"
+    echo
+    echo "  echo '$TARGET $HOSTNAME' | sudo tee -a /etc/hosts"
+    echo
+fi
+
+echo "Enter workspace:"
+echo
+echo "  cd '$BASE'"
+echo "  source target.env"
+echo
+echo "Working notes:"
+echo
+echo "  $BASE/notes.md"
+echo
+echo "Technical report:"
+echo
+echo "  $BASE/writeup.md"
+echo
+echo "Initial scan:"
+echo
+echo "  ./scan.sh"
+echo
